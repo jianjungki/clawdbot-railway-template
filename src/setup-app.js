@@ -7,8 +7,41 @@
   var authChoiceEl = document.getElementById('authChoice');
   var logEl = document.getElementById('log');
 
+  // Store form values to persist across refreshes
+  var savedFormValues = null;
+
   function setStatus(s) {
     statusEl.textContent = s;
+  }
+
+  function saveFormValues() {
+    savedFormValues = {
+      flow: document.getElementById('flow').value,
+      authGroup: authGroupEl.value,
+      authChoice: authChoiceEl.value,
+      authSecret: document.getElementById('authSecret').value,
+      telegramToken: document.getElementById('telegramToken').value,
+      discordToken: document.getElementById('discordToken').value,
+      slackBotToken: document.getElementById('slackBotToken').value,
+      slackAppToken: document.getElementById('slackAppToken').value
+    };
+  }
+
+  function restoreFormValues() {
+    if (!savedFormValues) return;
+    try {
+      document.getElementById('flow').value = savedFormValues.flow || 'quickstart';
+      authGroupEl.value = savedFormValues.authGroup || '';
+      authGroupEl.onchange();
+      authChoiceEl.value = savedFormValues.authChoice || '';
+      document.getElementById('authSecret').value = savedFormValues.authSecret || '';
+      document.getElementById('telegramToken').value = savedFormValues.telegramToken || '';
+      document.getElementById('discordToken').value = savedFormValues.discordToken || '';
+      document.getElementById('slackBotToken').value = savedFormValues.slackBotToken || '';
+      document.getElementById('slackAppToken').value = savedFormValues.slackAppToken || '';
+    } catch (e) {
+      // Ignore restore errors
+    }
   }
 
   function renderAuth(groups) {
@@ -53,15 +86,21 @@
     });
   }
 
-  function refreshStatus() {
+  function refreshStatus(shouldRestore) {
     setStatus('Loading...');
     return httpJson('/setup/api/status').then(function (j) {
-      var ver = j.clawdbotVersion ? (' | ' + j.clawdbotVersion) : '';
-      setStatus((j.configured ? 'Configured - open /clawdbot' : 'Not configured - run setup below') + ver);
+      var ver = j.moltbotVersion ? (' | ' + j.moltbotVersion) : '';
+      setStatus((j.configured ? 'Configured - open /moltbot' : 'Not configured - run setup below') + ver);
       renderAuth(j.authGroups || []);
+      
+      // Restore form values after rendering if requested
+      if (shouldRestore) {
+        restoreFormValues();
+      }
+      
       // If channels are unsupported, surface it for debugging.
       if (j.channelsAddHelp && j.channelsAddHelp.indexOf('telegram') === -1) {
-        logEl.textContent += '\nNote: this clawdbot build does not list telegram in `channels add --help`. Telegram auto-add will be skipped.\n';
+        logEl.textContent += '\nNote: this moltbot build does not list telegram in `channels add --help`. Telegram auto-add will be skipped.\n';
       }
 
     }).catch(function (e) {
@@ -70,6 +109,9 @@
   }
 
   document.getElementById('run').onclick = function () {
+    // Save form values before submission
+    saveFormValues();
+    
     var payload = {
       flow: document.getElementById('flow').value,
       authChoice: authChoiceEl.value,
@@ -93,7 +135,8 @@
       var j;
       try { j = JSON.parse(text); } catch (_e) { j = { ok: false, output: text }; }
       logEl.textContent += (j.output || JSON.stringify(j, null, 2));
-      return refreshStatus();
+      // Restore form values after refresh
+      return refreshStatus(true);
     }).catch(function (e) {
       logEl.textContent += '\nError: ' + String(e) + '\n';
     });
@@ -127,11 +170,13 @@
   document.getElementById('reset').onclick = function () {
     if (!confirm('Reset setup? This deletes the config file so onboarding can run again.')) return;
     logEl.textContent = 'Resetting...\n';
+    // Clear saved values on reset
+    savedFormValues = null;
     fetch('/setup/api/reset', { method: 'POST', credentials: 'same-origin' })
       .then(function (res) { return res.text(); })
-      .then(function (t) { logEl.textContent += t + '\n'; return refreshStatus(); })
+      .then(function (t) { logEl.textContent += t + '\n'; return refreshStatus(false); })
       .catch(function (e) { logEl.textContent += 'Error: ' + String(e) + '\n'; });
   };
 
-  refreshStatus();
+  refreshStatus(false);
 })();
