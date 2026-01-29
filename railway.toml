@@ -9,3 +9,7 @@ restartPolicyType = "on_failure"
 [variables]
 PORT = "8080"
 MOLTBOT_PUBLIC_PORT = "8080"
+MOLTBOT_STATE_DIR = "/data/.moltbot"
+MOLTBOT_WORKSPACE_DIR = "/data/workspace"
+SETUP_PASSWORD = "${{ random.string(16) }}"
+MOLTBOT_GATEWAY_TOKEN = "${{ random.string(32) }}"
